@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
   error:
     whitelabel:
       enabled: false
@@ -11,26 +11,18 @@ spring:
   application:
     name: lotto-backend
 
+  profiles:
+    default: local
+
   jackson:
     serialization:
       write-dates-as-timestamps: false
-
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: method
-    tags-sorter: alpha
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
-  endpoint:
-    health:
-      show-details: never
 
 info:
   app:
