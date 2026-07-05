@@ -16,6 +16,5 @@ public class HomeController {
                 "message", "로또 마법진 백엔드 서버가 실행 중입니다."
         );
     }
-
-
+    
 }

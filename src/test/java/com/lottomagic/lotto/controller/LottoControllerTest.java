@@ -92,7 +92,7 @@ class LottoControllerTest {
                 "우주 통신 연결 완료",
                 selectedOptions,
                 3,
-                "/images/spells/3.png"
+                "/3.png"
         );
 
         when(lottoService.draw(any(LottoRequest.class)))
@@ -124,7 +124,7 @@ class LottoControllerTest {
                 .andExpect(jsonPath("$.selectedOptions[2]").value("외계인의텔레파시"))
 
                 .andExpect(jsonPath("$.spellNumber").value(3))
-                .andExpect(jsonPath("$.spellImageUrl").value("/images/spells/3.png"));
+                .andExpect(jsonPath("$.spellImageUrl").value("/3.png"));
 
         verify(lottoService).draw(any(LottoRequest.class));
     }

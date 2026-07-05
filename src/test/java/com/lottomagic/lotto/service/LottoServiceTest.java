@@ -44,7 +44,7 @@ class LottoServiceTest {
                 () -> assertTrue(response.spellNumber() >= 1),
                 () -> assertTrue(response.spellNumber() <= 9),
                 () -> assertEquals(
-                        "/images/spells/" + response.spellNumber() + ".png",
+                        "/" + response.spellNumber() + ".png",
                         response.spellImageUrl()
                 )
         );

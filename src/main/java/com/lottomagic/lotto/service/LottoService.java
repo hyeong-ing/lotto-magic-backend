@@ -207,6 +207,6 @@ public class LottoService {
     }
 
     private String generateSpellImageUrl(int spellNumber) {
-        return "/images/spells/" + spellNumber + ".png";
+        return "/" + spellNumber + ".png";
     }
 }

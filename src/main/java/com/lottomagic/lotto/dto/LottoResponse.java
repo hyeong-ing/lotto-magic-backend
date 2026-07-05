@@ -38,7 +38,7 @@ public record LottoResponse (
 
         @Schema(
                 description = "마법진 이미지 경로",
-                example = "/images/spells/3.png"
+                example = "/3.png"
         )
         String spellImageUrl
 ){
