@@ -261,24 +261,21 @@ public ResponseEntity<ErrorResponse> handleValidation(
 
 1) 문제 발생 <br/>
 
-+ Next.js 프론트엔드와 Spring Boot 백엔드가 서로 다른 주소에서 실행되어 API 요청이 CORS 정책에 의해 차단되었습니다.
-+ 로컬 환경과 배포 환경의 프론트엔드 주소가 달라, 허용 주소를 코드에 고정하면 환경이 바뀔 때마다 수정해야 했습니다.
++ 프론트엔드와 백엔드가 서로 다른 주소에서 실행되어 요청이 CORS 정책에 의해 차단되었습니다.
 
-<br/><br/>
+<br/>
 
 2) 원인 파악 <br/>
 
-+ 브라우저는 프로토콜, 도메인 또는 포트가 다르면 서로 다른 출처로 판단합니다.
-+ 이 프로젝트는 여러 `/api/**` 엔드포인트에서 동일한 CORS 정책을 사용하므로, 컨트롤러마다 `@CrossOrigin`을 작성하면 설정이 분산되고 중복될 수 있었습니다.
-+ 또한 Spring Security를 사용하지 않아 Security Filter가 아닌 Spring MVC 계층에서 CORS를 설정하면 충분했습니다.
-
-<br/><br/>
++ 백엔드에 프론트엔드 출처를 허용하는 CORS 설정이 필요했습니다.
++ 여러 API에 같은 정책을 적용해야 해 컨트롤러별 `@CrossOrigin`보다 전역 설정이 적합해보였습니다.
+  
+<br/>
 
 3) 문제 해결 <br/>
 
-+ `WebMvcConfigurer`를 사용해 `/api/**`에 공통 CORS 정책을 적용했습니다.
-+ 허용할 프론트엔드 주소는 `@Value`로 주입받아, 코드를 변경하지 않고 환경별 설정값만 교체하도록 구성했습니다.
-+ 인증 쿠키를 사용하지 않으므로 `allowCredentials(false)`로 설정하고, 사전 요청 결과는 1시간 동안 캐시하도록 했습니다.
++ `WebMvcConfigurer`로 `/api/**` 요청에 CORS 정책을 공통 적용했습니다.
++ 로컬과 배포 환경에서 허용할 주소가 다르므로, 주소는 설정값으로 주입받도록 구성했습니다.
 
 ```java
 @Value("${app.cors.allowed-origin:http://localhost:3000}")
@@ -292,7 +289,8 @@ registry.addMapping("/api/**")
         .maxAge(3600);
 ```
 
-
+<br/>
+<br/>
 
 
 
