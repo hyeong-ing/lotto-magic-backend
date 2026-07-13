@@ -61,5 +61,120 @@
 <br/>
 
 ### 🔶 프로젝트 목표
-+ 
++ Swagger와 OpenAPI를 활용해 요청과 응답 규격을 문서화하기.
++ JUnit 5, Mockito, MockMvc를 활용해 프론트엔드에 의존하지 않고 백엔드 기능 검증하기.
++ 입력값 검증과 전역 예외 처리를 적용해 일관된 오류 응답 형식 구현하기.
++ Docker, 환경 변수와 Actuator를 적용해 배포 및 운영 환경을 고려한 서버 구성하기.
+
+<br/>
+<br/>
+
+### 🔶 핵심 로직
+1) 선택 요소 검증 <br/>
+사용자가 전달한 선택 요소가 로또 번호 생성 조건을 만족하는지 검증했습니다.
+
++ 선택 요소는 정확히 3개여야 합니다.
++ 빈 값이나 서버에 등록되지 않은 요소는 사용할 수 없습니다.
++ 동일한 요소를 중복해서 선택할 수 없습니다.
+
+```java
+    if (selectedOptions == null || selectedOptions.size() != 3) {
+        throw new IllegalArgumentException(
+                "요소는 정확히 3개 선택해야 합니다."
+        );
+    }
+    ...
+```
+
+<br/>
+<br/>
+
+----
+
+2) 선택 요소 <br/>
+선택한 요소마다 설정된 점수를 합산하고 해당 점수를 번호 생성 과정에 반영했습니다.
+
++ 0부터 44 사이의 중복되지 않는 인덱스 6개를 생성합니다.
++ 각 인덱스를 선택 요소 점수만큼 이동시킵니다.
+```java
+private List<Integer> generateLottoNumbers(int optionScore) {
+    Set<Integer> randomIndexes = new LinkedHashSet<>();
+
+    while (randomIndexes.size() < 6) {
+        randomIndexes.add(random.nextInt(45));
+    }
+
+    List<Integer> numbers = randomIndexes.stream()
+            .map(index -> (index + optionScore) % 45 + 1)
+            .sorted()
+            .toList();
+
+    return numbers;
+}
+```
+
+<br/>
+<br/>
+
+----
+
+3) 행운 점수와 메시지, 마법진 생성 <br/>
+선택한 요소뿐만 아니라 날짜와 무작위 값을 함께 사용해 매번 다른 행운 결과가 나타나도록 생성했습니다.
+
++ 기본 점수는 10부터 60 사이에서 무작위로 정합니다.
++ 선택 요소 점수와 오늘 날짜의 마지막 숫자를 더합니다.
++ -5부터 5사이의 무작위 보정값을 추가합니다.
++ 점수 구간에 따라 행운 메시지를 선택하고, 9개의 마법진 중 하나를 반환합니다.
+
+```java
+private int generateLuckScore(int optionScore) {
+    int baseScore = random.nextInt(51) + 10;
+    int todayLastDigit =
+            LocalDate.now(clock).getDayOfMonth() % 10;
+    int randomAdjustment = random.nextInt(11) - 5;
+
+    int score = baseScore
+            + optionScore
+            + todayLastDigit
+            + randomAdjustment;
+
+    return Math.max(0, Math.min(score, 100));
+}
+```
+```java
+private String pickLuckMessage(int score) {
+    if (score <= 20) return "우주 와이파이 끊김";
+    if (score <= 40) return "조상님이 애쓰는 중";
+    if (score <= 60) return "요정의 행운이 다가오는 중";
+    if (score <= 80) return "내인생약간상승황동티켓";
+    if (score <= 92) return "우주 통신 연결 완료";
+
+    return "외계인도 박수치는 날";
+}
+```
+<br/>
+<br/>
+
+----
+
+4) 공통 에러 응답 처리 <br/>
+컨트롤러와 서비스에서 발생하는 오류를 전역 예외 처리 클래스에서 관리했습니다.
+
++ 요청값 검증 실패와 서비스 검증 실패는 400 Bad Request로 반환합니다.
++ 잘못된 JSON 요청과 예상하지 못한 서버 오류를 구분해 처리합니다.
++ 모든 오류를 동일한 응답 구조로 전달해 프론트엔드가 일관되게 처리할 수 있도록 했습니다.
+
+```java
+@ExceptionHandler(IllegalArgumentException.class)
+public ResponseEntity<ErrorResponse> handle(
+        IllegalArgumentException exception
+) {
+    return ResponseEntity.badRequest()
+            .body(createErrorResponse(exception));
+}
+```
+
+<br/>
+<br/>
+
 
