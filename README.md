@@ -91,7 +91,7 @@
 
 ----
 
-2) 선택 요소 <br/>
+2) 로또 번호 생성 <br/>
 선택한 요소마다 설정된 점수를 합산하고 해당 점수를 번호 생성 과정에 반영했습니다.
 
 + 0부터 44 사이의 중복되지 않는 인덱스 6개를 생성합니다.
@@ -160,7 +160,7 @@ private String pickLuckMessage(int score) {
 4) 공통 에러 응답 처리 <br/>
 컨트롤러와 서비스에서 발생하는 오류를 전역 예외 처리 클래스에서 관리했습니다.
 
-+ 요청값 검증 실패와 서비스 검증 실패는 400 Bad Request로 반환합니다.
++ 요청값 검증 실패와 서비스 검증 실패는 `400 Bad Request`로 반환합니다.
 + 잘못된 JSON 요청과 예상하지 못한 서버 오류를 구분해 처리합니다.
 + 모든 오류를 동일한 응답 구조로 전달해 프론트엔드가 일관되게 처리할 수 있도록 했습니다.
 
@@ -176,5 +176,130 @@ public ResponseEntity<ErrorResponse> handle(
 
 <br/>
 <br/>
+<br/>
+
+### 🔶 문제 해결
+
+### [ 로또 번호 계산을 인덱스 기반으로 변경 ] <br/>
+
+1) 문제 발생 <br/>
+
++ 처음에는 `1~45` 범위의 로또 번호를 직접 생성한 뒤, 선택 요소 점수만큼 이동시키도록 구현했습니다.
++ 하지만 `45`를 초과한 번호를 순환시키기 위해 `-1`, `%45`, `+1` 처리를 반복해야했습니다.
+
+<br/>
+
+2) 원인 파악 <br/>
+
++ 작성된 계산식은 결국 번호를 잠시 `0~44` 범위로 바꿨다가 다시 로또 번호로 변환하는 구조였습니다.
++ 사실상 인덱스 방식과 동일한 계산을 하고 있었습니다.
+
+<br/>
+
+3) 문제 해결 <br/>
+
++ 처음부터 `0~44` 범위의 인덱스를 생성하고 점수만큼 이동한 뒤, 마지막에 `1`을 더해 로또 번호로 변환했습니다.
++ 계산용 인덱스와 실제 로또 번호를 분리하면서 코드가 간결해졌고 순환 이동 로직의 의도가 더 명확해졌습니다.
+
+```java
+int randomIndex = random.nextInt(45);
+int movedIndex = (randomIndex + selectedOptionScore) % 45;
+int lottoNumber = movedIndex + 1;
+```
+
+<br/>
+<br/>
+
+
+### [ @Valid 검증 예외 미처리 ] <br/>
+
+1) 문제 발생 <br/>
+
++ 선택 요소를 2개만 전달했을 때 `400 Bad Request`가 반환되는지 확인하는 테스트를 작성했습니다.
++ 그러나 예상과 달리 `500 Internal Service Error`가 반환되었습니다.
+
+<br/>
+
+2) 원인 파악 <br/>
+
++ `LottoRequst`에 요소 개수를 3개로 제한하는 `@Size`가 적용되어 있었습니다.
++ 컨트롤러의 `@Valid`가 서비스 호출 전에 요청값을 검증하면서 `MethodArgumentNotValidException`이 먼저 발생했습니다.
++ 해당 예외를 처리하는 메서드가 없어, 모든 예외를 처리하는 `Exception` 핸들러가 이를 잡고 500 응답을 반환했습니다.
++ 따라서 Mock으로 설정한 `lottoService.draw()`는 실제로 호출되지 않았습니다.
+
+```java
+@Size(min = 3, max = 3, message = "3개의 요소를 선택해주세요.")
+List<String> selectedOptions
+```
+<br/>
+
+3) 문제 해결 <br/>
+
++ `MethodArgumentNotValidException` 전용 핸들러를 추가했습니다.
++ DTO에 작성한 검증 메시지를 추출해 일관된 `400 Bad Request` 응답으로 반환하도록 수정했습니다.
+
+```java
+@ExceptionHandler(MethodArgumentNotValidException.class)
+public ResponseEntity<ErrorResponse> handleValidation(
+        MethodArgumentNotValidException exception,
+        HttpServletRequest request
+) {
+    String message = exception.getBindingResult()
+            .getFieldErrors()
+            .getFirst()
+            .getDefaultMessage();
+
+    return ResponseEntity.badRequest()
+            .body(createErrorResponse(message, request));
+}
+```
+
+<br/>
+<br/>
+
+### [ CORS 문제 ] <br/>
+
+1) 문제 발생 <br/>
+
++ Next.js 프론트엔드와 Spring Boot 백엔드가 서로 다른 주소에서 실행되어 API 요청이 CORS 정책에 의해 차단되었습니다.
++ 로컬 환경과 배포 환경의 프론트엔드 주소가 달라, 허용 주소를 코드에 고정하면 환경이 바뀔 때마다 수정해야 했습니다.
+
+<br/><br/>
+
+2) 원인 파악 <br/>
+
++ 브라우저는 프로토콜, 도메인 또는 포트가 다르면 서로 다른 출처로 판단합니다.
++ 이 프로젝트는 여러 `/api/**` 엔드포인트에서 동일한 CORS 정책을 사용하므로, 컨트롤러마다 `@CrossOrigin`을 작성하면 설정이 분산되고 중복될 수 있었습니다.
++ 또한 Spring Security를 사용하지 않아 Security Filter가 아닌 Spring MVC 계층에서 CORS를 설정하면 충분했습니다.
+
+<br/><br/>
+
+3) 문제 해결 <br/>
+
++ `WebMvcConfigurer`를 사용해 `/api/**`에 공통 CORS 정책을 적용했습니다.
++ 허용할 프론트엔드 주소는 `@Value`로 주입받아, 코드를 변경하지 않고 환경별 설정값만 교체하도록 구성했습니다.
++ 인증 쿠키를 사용하지 않으므로 `allowCredentials(false)`로 설정하고, 사전 요청 결과는 1시간 동안 캐시하도록 했습니다.
+
+```java
+@Value("${app.cors.allowed-origin:http://localhost:3000}")
+private String allowedOrigin;
+
+registry.addMapping("/api/**")
+        .allowedOrigins(allowedOrigin)
+        .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+        .allowedHeaders("*")
+        .allowCredentials(false)
+        .maxAge(3600);
+```
+
+
+
+
+
+
+
+
+
+
 
 
