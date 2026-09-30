@@ -24,7 +24,7 @@
 ### 🔶 프로젝트 관련 링크
 
 + [Blog (프로젝트 기록)](https://post-this.tistory.com/category/%F0%9F%92%BB%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8/%F0%9F%8D%80%ED%96%89%EC%9A%B4%EC%9D%98%20%EB%A1%9C%EB%98%90%20%EB%A7%88%EB%B2%95%EC%A7%84%F0%9F%9B%B8)
-+ Youtube (동작화면)
++ YouTube (동작화면)
 + [Figma (다이어그램)](https://www.figma.com/board/l2IJSK7tnbOUJtfsGLfCHB/Lotto-Magic-Circle?node-id=0-1&t=GXmAo1ozuWh2cIsq-1)
 
 
@@ -32,6 +32,7 @@
 <br/>
 
 ### 🔶 프로젝트 설명
+처음 읽는 분도 이해할 수 있도록 주요 기능과 구현 과정을 중심으로 정리했습니다. <br/>
 
 <br/>
 
@@ -46,6 +47,7 @@
 + 요소 점수와 날짜, 무작위 값을 조합해 행운 점수를 계산합니다.
 + 점수 구간에 따른 행운의 메시지와 무작위 마법진 이미지를 제공합니다.
 + 별도의 데이터베이스 없이 요청마다 새로운 결과를 생성합니다.
++ 선택 요소와 행운 점수는 재미를 위한 장치이며, 실제 로또 당첨 확률을 높이는 기능은 아닙니다.
 
 <br/>
 <br/>
@@ -95,20 +97,25 @@
 선택한 요소마다 설정된 점수를 합산하고 해당 점수를 번호 생성 과정에 반영했습니다.
 
 + 0부터 44 사이의 중복되지 않는 인덱스 6개를 생성합니다.
-+ 각 인덱스를 선택 요소 점수만큼 이동시킵니다.
++ 각 인덱스를 선택 요소 점수만큼 이동시킨 뒤 1을 더해 실제 번호로 바꾸고, 작은 번호부터 정렬합니다.
++ 아래 코드의 상수는 번호 개수 6개, 최댓값 45, 최솟값 1을 뜻합니다.
 ```java
-private List<Integer> generateLottoNumbers(int optionScore) {
+private List<Integer> generateLottoNumbers(int selectedOptionScore) {
     Set<Integer> randomIndexes = new LinkedHashSet<>();
 
-    while (randomIndexes.size() < 6) {
-        randomIndexes.add(random.nextInt(45));
+    while (randomIndexes.size() < LOTTO_NUMBER_COUNT) {
+        int randomIndex = random.nextInt(LOTTO_MAX_NUMBER);
+        randomIndexes.add(randomIndex);
     }
 
-    List<Integer> numbers = randomIndexes.stream()
-            .map(index -> (index + optionScore) % 45 + 1)
-            .sorted()
-            .toList();
+    List<Integer> numbers = new ArrayList<>();
+    for (int randomIndex : randomIndexes) {
+        int movedIndex = moveIndexByOptionScore(randomIndex, selectedOptionScore);
+        int lottoNumber = movedIndex + LOTTO_MIN_NUMBER;
+        numbers.add(lottoNumber);
+    }
 
+    Collections.sort(numbers);
     return numbers;
 }
 ```
@@ -123,7 +130,7 @@ private List<Integer> generateLottoNumbers(int optionScore) {
 
 + 기본 점수는 10부터 60 사이에서 무작위로 정합니다.
 + 선택 요소 점수와 오늘 날짜의 마지막 숫자를 더합니다.
-+ -5부터 5사이의 무작위 보정값을 추가합니다.
++ -5부터 5 사이의 무작위 보정값을 추가합니다.
 + 점수 구간에 따라 행운 메시지를 선택하고, 9개의 마법진 중 하나를 반환합니다.
 
 ```java
@@ -162,16 +169,21 @@ private String pickLuckMessage(int score) {
 
 + 요청값 검증 실패와 서비스 검증 실패는 `400 Bad Request`로 반환합니다.
 + 잘못된 JSON 요청과 예상하지 못한 서버 오류를 구분해 처리합니다.
-+ 모든 오류를 동일한 응답 구조로 전달해 프론트엔드가 일관되게 처리할 수 있도록 했습니다.
++ 위에서 처리한 오류는 동일한 응답 구조로 전달해 프론트엔드가 일관되게 처리할 수 있도록 했습니다.
++ 아래는 잘못된 선택 요소를 전달했을 때 오류 응답을 만드는 부분입니다.
 
 ```java
-@ExceptionHandler(IllegalArgumentException.class)
-public ResponseEntity<ErrorResponse> handle(
-        IllegalArgumentException exception
-) {
-    return ResponseEntity.badRequest()
-            .body(createErrorResponse(exception));
-}
+ErrorResponse response = new ErrorResponse(
+        HttpStatus.BAD_REQUEST.value(),
+        HttpStatus.BAD_REQUEST.getReasonPhrase(),
+        exception.getMessage(),
+        request.getRequestURI(),
+        LocalDateTime.now()
+);
+
+return ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(response);
 ```
 
 <br/>
@@ -185,7 +197,7 @@ public ResponseEntity<ErrorResponse> handle(
 1) 문제 발생 <br/>
 
 + 처음에는 `1~45` 범위의 로또 번호를 직접 생성한 뒤, 선택 요소 점수만큼 이동시키도록 구현했습니다.
-+ 하지만 `45`를 초과한 번호를 순환시키기 위해 `-1`, `%45`, `+1` 처리를 반복해야했습니다.
++ 하지만 `45`를 초과한 번호를 순환시키기 위해 `-1`, `%45`, `+1` 처리를 반복해야 했습니다.
 
 <br/>
 
@@ -216,13 +228,13 @@ int lottoNumber = movedIndex + 1;
 1) 문제 발생 <br/>
 
 + 선택 요소를 2개만 전달했을 때 `400 Bad Request`가 반환되는지 확인하는 테스트를 작성했습니다.
-+ 그러나 예상과 달리 `500 Internal Service Error`가 반환되었습니다.
++ 그러나 예상과 달리 `500 Internal Server Error`가 반환되었습니다.
 
 <br/>
 
 2) 원인 파악 <br/>
 
-+ `LottoRequst`에 요소 개수를 3개로 제한하는 `@Size`가 적용되어 있었습니다.
++ `LottoRequest`에 요소 개수를 3개로 제한하는 `@Size`가 적용되어 있었습니다.
 + 컨트롤러의 `@Valid`가 서비스 호출 전에 요청값을 검증하면서 `MethodArgumentNotValidException`이 먼저 발생했습니다.
 + 해당 예외를 처리하는 메서드가 없어, 모든 예외를 처리하는 `Exception` 핸들러가 이를 잡고 500 응답을 반환했습니다.
 + 따라서 Mock으로 설정한 `lottoService.draw()`는 실제로 호출되지 않았습니다.
@@ -237,21 +249,15 @@ List<String> selectedOptions
 
 + `MethodArgumentNotValidException` 전용 핸들러를 추가했습니다.
 + DTO에 작성한 검증 메시지를 추출해 일관된 `400 Bad Request` 응답으로 반환하도록 수정했습니다.
++ 아래는 검증 메시지를 꺼내는 부분입니다. Java 17에서 사용할 수 있는 `stream()`과 `findFirst()`를 사용했습니다.
 
 ```java
-@ExceptionHandler(MethodArgumentNotValidException.class)
-public ResponseEntity<ErrorResponse> handleValidation(
-        MethodArgumentNotValidException exception,
-        HttpServletRequest request
-) {
-    String message = exception.getBindingResult()
-            .getFieldErrors()
-            .getFirst()
-            .getDefaultMessage();
-
-    return ResponseEntity.badRequest()
-            .body(createErrorResponse(message, request));
-}
+String message = exception.getBindingResult()
+        .getFieldErrors()
+        .stream()
+        .map(FieldError::getDefaultMessage)
+        .findFirst()
+        .orElse("요청 값이 올바르지 않습니다.");
 ```
 
 <br/>
@@ -268,7 +274,7 @@ public ResponseEntity<ErrorResponse> handleValidation(
 2) 원인 파악 <br/>
 
 + 백엔드에 프론트엔드 출처를 허용하는 CORS 설정이 필요했습니다.
-+ 여러 API에 같은 정책을 적용해야 해 컨트롤러별 `@CrossOrigin`보다 전역 설정이 적합해보였습니다.
++ 여러 API에 같은 정책을 적용해야 해 컨트롤러별 `@CrossOrigin`보다 전역 설정이 적합해 보였습니다.
   
 <br/>
 
@@ -292,12 +298,8 @@ registry.addMapping("/api/**")
 <br/>
 <br/>
 
+### 🔶 실행 방법
 
-
-
-
-
-
-
-
-
++ Java 17 환경에서 이 저장소 폴더의 `./gradlew bootRun`을 실행합니다.
++ 테스트는 `./gradlew test`로 확인할 수 있습니다.
++ 화면까지 확인하려면 프론트엔드도 함께 실행해야 합니다.
