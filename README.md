@@ -24,7 +24,7 @@
 ### 🔶 프로젝트 관련 링크
 
 + [Blog (프로젝트 기록)](https://post-this.tistory.com/category/%F0%9F%92%BB%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8/%F0%9F%8D%80%ED%96%89%EC%9A%B4%EC%9D%98%20%EB%A1%9C%EB%98%90%20%EB%A7%88%EB%B2%95%EC%A7%84%F0%9F%9B%B8)
-+ YouTube (동작화면)
++ [YouTube (동작화면)](https://youtu.be/wLdzH0aJQ7o)
 + [Figma (다이어그램)](https://www.figma.com/board/l2IJSK7tnbOUJtfsGLfCHB/Lotto-Magic-Circle?node-id=0-1&t=GXmAo1ozuWh2cIsq-1)
 
 
